@@ -74,7 +74,11 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
     
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.message || `HTTP Error ${res.status}`);
+      let errorMsg = data.message || `HTTP Error ${res.status}`;
+      if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+        errorMsg = data.errors.join(' | ');
+      }
+      throw new Error(errorMsg);
     }
     return data;
   } catch (err) {
@@ -160,8 +164,22 @@ function updateAuthModalUI() {
   const isReg = currentAuthMode === 'register';
   document.getElementById('authModalTitle').innerText = isReg ? 'Create Account' : 'Welcome Back';
   document.getElementById('authModalSubtitle').innerText = isReg ? 'Register as User or Admin to manage bookings' : 'Login to access your bookings';
-  document.getElementById('nameGroup').style.display = isReg ? 'block' : 'none';
-  document.getElementById('roleGroup').style.display = isReg ? 'block' : 'none';
+  
+  const nameGroup = document.getElementById('nameGroup');
+  const roleGroup = document.getElementById('roleGroup');
+  const authNameInput = document.getElementById('authName');
+  const authPassInput = document.getElementById('authPassword');
+
+  nameGroup.style.display = isReg ? 'block' : 'none';
+  roleGroup.style.display = isReg ? 'block' : 'none';
+  authNameInput.required = isReg;
+  
+  if (isReg) {
+    authPassInput.setAttribute('minlength', '6');
+  } else {
+    authPassInput.removeAttribute('minlength');
+  }
+
   document.getElementById('authSubmitBtn').innerHTML = isReg ? '<i class="fa-solid fa-user-plus"></i> Register' : '<i class="fa-solid fa-right-to-bracket"></i> Login';
   document.getElementById('authToggleText').innerText = isReg ? 'Already have an account?' : "Don't have an account?";
   document.getElementById('authToggleLink').innerText = isReg ? 'Login' : 'Register Now';
@@ -169,16 +187,22 @@ function updateAuthModalUI() {
 
 async function handleAuthSubmit(e) {
   e.preventDefault();
-  const email = document.getElementById('authEmail').value;
+  const email = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
 
   try {
     let response;
     if (currentAuthMode === 'register') {
-      const name = document.getElementById('authName').value;
+      const name = document.getElementById('authName').value.trim();
       const role = document.getElementById('authRole').value;
+
+      if (!name) {
+        showToast('Please enter your name', 'error');
+        return;
+      }
+
       response = await apiRequest('/auth/register', 'POST', { name, email, password, role });
-      showToast('Registration successful!', 'success');
+      showToast('Registration successful! Welcome to SlotSync', 'success');
     } else {
       response = await apiRequest('/auth/login', 'POST', { email, password });
       showToast('Login successful!', 'success');
@@ -192,6 +216,7 @@ async function handleAuthSubmit(e) {
       role: response.role
     }));
 
+    document.getElementById('authForm').reset();
     closeAuthModal();
     checkAuth();
     loadSlots();
