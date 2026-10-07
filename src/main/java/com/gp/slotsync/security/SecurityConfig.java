@@ -41,6 +41,7 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/*.html", "/*.css", "/*.js", "/*.ico").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 
                 // Admin endpoints

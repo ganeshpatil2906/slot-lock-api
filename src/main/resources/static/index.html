@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SlotSync — Real-Time Slot Reservation Platform</title>
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- Background Decorative Glowing Lights -->
+  <div class="bg-glow-1"></div>
+  <div class="bg-glow-2"></div>
+
+  <!-- Main App Shell -->
+  <div class="app-container">
+
+    <!-- Navbar -->
+    <header class="navbar">
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-calendar-check"></i>
+        </div>
+        <span>SlotSync</span>
+      </div>
+
+      <div class="nav-user" id="navUserSection">
+        <!-- Dynamic User Badge or Login Button -->
+        <button class="btn btn-primary" onclick="openAuthModal('login')">
+          <i class="fa-solid fa-right-to-bracket"></i> Login / Register
+        </button>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs-nav">
+      <button class="tab-btn active" data-tab="slotsTab">
+        <i class="fa-solid fa-clock"></i> Browse Slots
+      </button>
+      <button class="tab-btn" data-tab="resourcesTab">
+        <i class="fa-solid fa-building"></i> Resources
+      </button>
+      <button class="tab-btn" data-tab="myBookingsTab">
+        <i class="fa-solid fa-ticket"></i> My Bookings
+      </button>
+      <button class="tab-btn admin-only" data-tab="adminTab" id="adminTabBtn" style="display: none;">
+        <i class="fa-solid fa-gear"></i> Admin Actions
+      </button>
+    </nav>
+
+    <!-- TAB 1: BROWSE SLOTS -->
+    <section class="tab-content active" id="slotsTab">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2>Available Time Slots</h2>
+          <p>Find and hold available time slots in real time</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="loadSlots()">
+          <i class="fa-solid fa-rotate-right"></i> Refresh
+        </button>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-bar">
+        <div class="form-group">
+          <label class="form-label">Filter by Resource</label>
+          <select class="form-select" id="filterResource" onchange="loadSlots()">
+            <option value="">All Resources</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Filter by Status</label>
+          <select class="form-select" id="filterStatus" onchange="loadSlots()">
+            <option value="">All Statuses</option>
+            <option value="AVAILABLE" selected>AVAILABLE Only</option>
+            <option value="HELD">HELD</option>
+            <option value="BOOKED">BOOKED</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Slots Grid -->
+      <div class="grid-cards" id="slotsGrid">
+        <div class="empty-state">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          <p>Loading slots...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: RESOURCES -->
+    <section class="tab-content" id="resourcesTab">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2>Bookable Resources</h2>
+          <p>Explore facilities, meeting rooms, and equipment available for booking</p>
+        </div>
+        <button class="btn btn-primary admin-only" id="createResourceBtn" style="display: none;" onclick="openCreateResourceModal()">
+          <i class="fa-solid fa-plus"></i> Add Resource
+        </button>
+      </div>
+
+      <div class="grid-cards" id="resourcesGrid">
+        <div class="empty-state">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          <p>Loading resources...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: MY BOOKINGS -->
+    <section class="tab-content" id="myBookingsTab">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2>My Bookings</h2>
+          <p>Manage your held reservations and confirmed bookings</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="loadMyBookings()">
+          <i class="fa-solid fa-rotate-right"></i> Refresh
+        </button>
+      </div>
+
+      <div class="grid-cards" id="myBookingsGrid">
+        <div class="empty-state">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          <p>Loading your bookings...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: ADMIN PANEL -->
+    <section class="tab-content" id="adminTab">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2>Admin Management Panel</h2>
+          <p>Create new bookable resources and generate time slots</p>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 24px;">
+        <!-- Create Resource Form -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-square-plus" style="color: var(--primary);"></i> Create Resource</div>
+          </div>
+          <form id="createResourceForm" onsubmit="handleCreateResource(event)">
+            <div class="form-group">
+              <label class="form-label">Resource Name</label>
+              <input type="text" class="form-input" id="resName" placeholder="e.g. Conference Room A" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Resource Type</label>
+              <input type="text" class="form-input" id="resType" placeholder="e.g. MEETING_ROOM, EQUIPMENT, VENUE" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+              <i class="fa-solid fa-plus"></i> Create Resource
+            </button>
+          </form>
+        </div>
+
+        <!-- Create Slot Form -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-calendar-plus" style="color: var(--accent-purple);"></i> Create Time Slot</div>
+          </div>
+          <form id="createSlotForm" onsubmit="handleCreateSlot(event)">
+            <div class="form-group">
+              <label class="form-label">Target Resource</label>
+              <select class="form-select" id="slotResourceId" required>
+                <option value="">Select Resource...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Start Time</label>
+              <input type="datetime-local" class="form-input" id="slotStartTime" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">End Time</label>
+              <input type="datetime-local" class="form-input" id="slotEndTime" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+              <i class="fa-solid fa-clock"></i> Publish Time Slot
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- AUTH MODAL (Login / Register) -->
+  <div class="modal-overlay" id="authModal">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="modal-title" id="authModalTitle">Welcome Back</div>
+        <button onclick="closeAuthModal()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.25rem;">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-subtitle" id="authModalSubtitle">Login to access your bookings and slots</div>
+
+      <form id="authForm" onsubmit="handleAuthSubmit(event)">
+        <div class="form-group" id="nameGroup" style="display: none;">
+          <label class="form-label">Full Name</label>
+          <input type="text" class="form-input" id="authName" placeholder="John Doe">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" class="form-input" id="authEmail" placeholder="name@example.com" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-input" id="authPassword" placeholder="••••••••" required>
+        </div>
+
+        <div class="form-group" id="roleGroup" style="display: none;">
+          <label class="form-label">Select Account Role</label>
+          <select class="form-select" id="authRole">
+            <option value="USER">Standard User</option>
+            <option value="ADMIN">Administrator (ADMIN)</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;" id="authSubmitBtn">
+          <i class="fa-solid fa-right-to-bracket"></i> Login
+        </button>
+      </form>
+
+      <div style="text-align: center; margin-top: 20px; font-size: 0.875rem; color: var(--text-muted);">
+        <span id="authToggleText">Don't have an account?</span>
+        <a href="#" onclick="toggleAuthMode(event)" id="authToggleLink" style="color: var(--primary); font-weight: 700; text-decoration: none; margin-left: 6px;">Register Now</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATIONS CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- JavaScript App Logic -->
+  <script src="/js/app.js"></script>
+</body>
+</html>
