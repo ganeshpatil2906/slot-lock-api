@@ -5,3 +5,5 @@ target/
 .project
 .settings/
 *.log
+test-recordings/
+test-reports/
