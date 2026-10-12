@@ -242,6 +242,10 @@ SlotSync ships with an integrated responsive web application hosted on the root 
 - **My Bookings Panel**: Instant one-click confirmation and cancellation controls.
 - **Admin Control Suite**: Real-time modal to add new resources and time slot schedules.
 
+<p align="center">
+  <img src="docs/screenshots/slotsync-dashboard.png" alt="SlotSync Real-Time Slot Reservation Dashboard" width="95%" />
+</p>
+
 Access the UI at: **`http://localhost:8088`**
 
 ---
@@ -255,6 +259,10 @@ The project includes an automated end-to-end regression suite using **Microsoft 
 - **Automatic Failure Screenshots**: Playwright captures Base64 and PNG screenshots on test failure.
 - **Full Video & Trace Recording**: All test execution video sessions are saved under `test-recordings/`.
 - **Interactive HTML Reports**: TestNG listener automatically outputs detailed execution reports to `test-reports/ExtentReport.html`.
+
+<p align="center">
+  <img src="docs/screenshots/extent-test-report.png" alt="ExtentReports Playwright Automation Execution Report" width="95%" />
+</p>
 
 ---
 
