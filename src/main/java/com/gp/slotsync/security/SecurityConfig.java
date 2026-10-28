@@ -35,7 +35,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(AbstractHttpConfigurer::disable)
+            .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
@@ -54,6 +54,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/resources", "/api/v1/resources/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/slots", "/api/v1/slots/**").authenticated()
                 .requestMatchers("/api/v1/bookings", "/api/v1/bookings/**").authenticated()
+                .requestMatchers("/api/v1/ai/**").authenticated()
 
                 .anyRequest().authenticated()
             );

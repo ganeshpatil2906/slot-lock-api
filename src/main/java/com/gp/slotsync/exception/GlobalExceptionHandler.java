@@ -40,6 +40,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
+    @ExceptionHandler(AbuseDetectedException.class)
+    public ResponseEntity<ErrorResponse> handleAbuseDetected(AbuseDetectedException ex) {
+        ErrorResponse error = new ErrorResponse(HttpStatus.TOO_MANY_REQUESTS.value(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error);
+    }
+
     @ExceptionHandler({OptimisticLockingFailureException.class, OptimisticLockException.class})
     public ResponseEntity<ErrorResponse> handleOptimisticLockFailure(Exception ex) {
         ErrorResponse error = new ErrorResponse(

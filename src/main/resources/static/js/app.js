@@ -52,6 +52,8 @@ function initTabs() {
       if (targetTabId === 'slotsTab') loadSlots();
       if (targetTabId === 'resourcesTab') loadResources();
       if (targetTabId === 'myBookingsTab') loadMyBookings();
+      if (targetTabId === 'aiTab') refreshAiHubData();
+      if (targetTabId === 'adminTab' && currentUser && currentUser.role === 'ADMIN') loadAdminAiAudit();
     });
   });
 }
@@ -315,7 +317,12 @@ function renderSlots(slots) {
             <div class="card-title">${slot.resourceName}</div>
             <div class="card-subtitle">Slot #${slot.id}</div>
           </div>
-          <span class="badge badge-${slot.status.toLowerCase()}">${slot.status}</span>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <span class="badge badge-dynamic-ttl" title="Real-time contention monitoring active">
+              <i class="fa-solid fa-bolt"></i> AI TTL
+            </span>
+            <span class="badge badge-${slot.status.toLowerCase()}">${slot.status}</span>
+          </div>
         </div>
         <div class="card-body">
           <div class="info-row">
@@ -325,7 +332,7 @@ function renderSlots(slots) {
         </div>
         ${isAvailable ? `
           <button class="btn btn-primary" style="width: 100%;" onclick="holdSlot(${slot.id})">
-            <i class="fa-solid fa-hand"></i> Hold Slot (15 min)
+            <i class="fa-solid fa-hand"></i> Hold Slot (Dynamic AI TTL)
           </button>
         ` : `
           <button class="btn btn-secondary" style="width: 100%;" disabled>
@@ -349,13 +356,13 @@ async function holdSlot(slotId) {
   const idempotencyKey = `hold_${slotId}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
   try {
+    // Omitting holdDurationMinutes instructs the AI engine to compute the dynamic TTL
     const booking = await apiRequest('/bookings/hold', 'POST', {
       slotId: slotId,
-      idempotencyKey: idempotencyKey,
-      holdDurationMinutes: 15
+      idempotencyKey: idempotencyKey
     });
 
-    showToast(`Slot #${slotId} placed on hold!`, 'success');
+    showToast(`Slot #${slotId} placed on hold with Dynamic AI TTL!`, 'success');
     loadSlots();
     // Switch to My Bookings tab
     document.querySelector('[data-tab="myBookingsTab"]').click();
@@ -423,6 +430,14 @@ function renderMyBookings(bookings) {
               <span class="countdown-box" id="timer-${b.id}">Calculating...</span>
             </div>
           ` : ''}
+          ${isConfirmed ? `
+            <div class="info-row" style="margin-top: 4px;">
+              <i class="fa-solid fa-shield-halved info-icon" style="color: #34d399;"></i>
+              <span id="ai-risk-${b.id}" class="badge badge-risk-low" style="font-size: 0.72rem;">
+                <i class="fa-solid fa-spinner fa-spin"></i> Analyzing Attendance Risk...
+              </span>
+            </div>
+          ` : ''}
         </div>
         <div style="display: flex; gap: 10px;">
           ${isHeld ? `
@@ -443,6 +458,11 @@ function renderMyBookings(bookings) {
   // Start live timers for HELD items
   bookings.filter(b => b.status === 'HELD' && b.holdExpiresAt).forEach(b => {
     startCountdown(b.id, b.holdExpiresAt);
+  });
+
+  // Load AI risk predictions for CONFIRMED items
+  bookings.filter(b => b.status === 'CONFIRMED').forEach(b => {
+    loadBookingNoShowRisk(b.id);
   });
 }
 
@@ -526,5 +546,306 @@ async function handleCreateSlot(e) {
     loadSlots();
   } catch (err) {
     showToast(err.message || 'Failed to create slot', 'error');
+  }
+}
+
+// ==========================================================================
+// AI Suite & Copilot Frontend Handlers
+// ==========================================================================
+
+function openAiCopilotTab() {
+  const aiTabBtn = document.getElementById('aiTabBtn');
+  if (aiTabBtn) {
+    aiTabBtn.click();
+    const input = document.getElementById('aiChatInput');
+    if (input) input.focus();
+  }
+}
+
+async function sendAiQuickPrompt(prompt) {
+  const input = document.getElementById('aiChatInput');
+  if (input) {
+    input.value = prompt;
+    await sendAiMessage();
+  }
+}
+
+async function sendAiMessage() {
+  const input = document.getElementById('aiChatInput');
+  if (!input) return;
+  const message = input.value.trim();
+  if (!message) return;
+
+  if (!currentUser) {
+    openAuthModal('login');
+    showToast('Please login to chat with the AI Copilot', 'info');
+    return;
+  }
+
+  input.value = '';
+  const feed = document.getElementById('aiChatFeed');
+
+  // Render User Message
+  const userMsgEl = document.createElement('div');
+  userMsgEl.className = 'chat-msg user';
+  userMsgEl.innerHTML = `
+    <div class="chat-avatar"><i class="fa-solid fa-user"></i></div>
+    <div class="chat-bubble">${escapeHtml(message)}</div>
+  `;
+  feed.appendChild(userMsgEl);
+
+  // Render Typing Indicator
+  const typingEl = document.createElement('div');
+  typingEl.className = 'chat-msg assistant typing-placeholder';
+  typingEl.innerHTML = `
+    <div class="chat-avatar"><i class="fa-solid fa-robot"></i></div>
+    <div class="chat-bubble">
+      <div class="typing-dots">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>
+  `;
+  feed.appendChild(typingEl);
+  feed.scrollTop = feed.scrollHeight;
+
+  try {
+    const res = await apiRequest('/ai/copilot/chat', 'POST', { message });
+    typingEl.remove();
+
+    // Render Assistant Reply
+    const assistantEl = document.createElement('div');
+    assistantEl.className = 'chat-msg assistant';
+
+    // Format markdown bolding and line breaks
+    let formattedReply = formatAiReply(res.reply);
+
+    let actionsHtml = '';
+    if (res.actions && res.actions.length > 0) {
+      actionsHtml = `<div class="chat-actions-container">` +
+        res.actions.map(a => `
+          <button class="chat-action-btn" onclick="handleAiAction('${a.actionType}', '${a.payload}')">
+            ${escapeHtml(a.label)}
+          </button>
+        `).join('') +
+        `</div>`;
+    }
+
+    assistantEl.innerHTML = `
+      <div class="chat-avatar"><i class="fa-solid fa-robot"></i></div>
+      <div class="chat-bubble">
+        <div>${formattedReply}</div>
+        ${actionsHtml}
+      </div>
+    `;
+    feed.appendChild(assistantEl);
+    feed.scrollTop = feed.scrollHeight;
+
+    // Trigger state refreshes if actions modified slots or bookings
+    if (res.detectedIntent === 'HOLD_SLOT_SUCCESS' || res.detectedIntent === 'CONFIRM_SUCCESS' || res.detectedIntent === 'CANCEL_SUCCESS') {
+      loadSlots();
+      loadMyBookings();
+      refreshAiHubData();
+    }
+  } catch (err) {
+    typingEl.remove();
+    const errorEl = document.createElement('div');
+    errorEl.className = 'chat-msg assistant';
+    errorEl.innerHTML = `
+      <div class="chat-avatar" style="background: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div class="chat-bubble" style="border-color: rgba(239, 68, 68, 0.4);">
+        ❌ ${escapeHtml(err.message || 'AI request failed')}
+      </div>
+    `;
+    feed.appendChild(errorEl);
+    feed.scrollTop = feed.scrollHeight;
+  }
+}
+
+async function handleAiAction(actionType, payload) {
+  if (actionType === 'HOLD_SLOT') {
+    await holdSlot(parseInt(payload));
+  } else if (actionType === 'CONFIRM_BOOKING') {
+    await confirmBooking(payload);
+  } else if (actionType === 'CANCEL_BOOKING') {
+    await cancelBooking(parseInt(payload));
+  } else if (actionType === 'BROWSE_SLOTS') {
+    document.querySelector('[data-tab="slotsTab"]').click();
+  } else if (actionType === 'MY_BOOKINGS') {
+    document.querySelector('[data-tab="myBookingsTab"]').click();
+  } else if (actionType === 'RECOMMEND') {
+    await sendAiQuickPrompt('Recommend best slot to minimize calendar gaps');
+  } else if (actionType === 'EXPLAIN_TTL') {
+    await sendAiQuickPrompt('Why is dynamic TTL used and how does lock contention work?');
+  } else if (actionType === 'VIEW_CONTENTION') {
+    openAiCopilotTab();
+  }
+}
+
+function formatAiReply(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function refreshAiHubData() {
+  // 1. Load System Contention Analytics
+  try {
+    const analytics = await apiRequest('/ai/contention/analytics');
+    const scoreEl = document.getElementById('aiContentionScore');
+    const barEl = document.getElementById('aiContentionBar');
+    const adviceEl = document.getElementById('aiTuningAdvice');
+    const pillEl = document.getElementById('aiContentionPill');
+
+    if (scoreEl && barEl) {
+      scoreEl.innerText = `${analytics.averageContentionScore} / 1.00`;
+      const pct = Math.min(100, Math.max(10, Math.round(analytics.averageContentionScore * 100)));
+      barEl.style.width = `${pct}%`;
+
+      if (analytics.averageContentionScore >= 0.5) {
+        barEl.style.background = '#ef4444';
+        pillEl.innerText = 'HIGH COLLISION';
+        pillEl.style.borderColor = '#ef4444';
+        pillEl.style.color = '#f87171';
+      } else {
+        barEl.style.background = '#22d3ee';
+        pillEl.innerText = 'HEALTHY';
+        pillEl.style.borderColor = 'rgba(6, 182, 212, 0.35)';
+        pillEl.style.color = '#22d3ee';
+      }
+    }
+
+    if (adviceEl && analytics.autoTuningRecommendations && analytics.autoTuningRecommendations.length > 0) {
+      adviceEl.innerHTML = analytics.autoTuningRecommendations.map(r => `• ${escapeHtml(r)}`).join('<br>');
+    }
+  } catch (err) {
+    console.error('Failed to load contention analytics', err);
+  }
+
+  // 2. Load Top Recommendations
+  try {
+    const recs = await apiRequest('/ai/recommendations?durationMinutes=60');
+    const container = document.getElementById('aiTopPicksContainer');
+    if (container) {
+      if (!recs || recs.length === 0) {
+        container.innerHTML = '<div style="font-size: 0.84rem; color: var(--text-muted);">No upcoming slots available for optimization.</div>';
+      } else {
+        container.innerHTML = recs.slice(0, 3).map(r => `
+          <div style="padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--glass-border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <strong style="font-size: 0.88rem;">${escapeHtml(r.resourceName)} (Slot #${r.slotId})</strong>
+              <span class="badge badge-optimal">${r.efficiencyScore}% Match</span>
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px;">
+              ${new Date(r.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })} — ${escapeHtml(r.reason)}
+            </div>
+            <button class="btn btn-primary btn-sm" style="width: 100%; font-size: 0.78rem; padding: 4px 8px;" onclick="holdSlot(${r.slotId})">
+              <i class="fa-solid fa-bolt"></i> Hold with Dynamic TTL
+            </button>
+          </div>
+        `).join('');
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load recommendations', err);
+  }
+
+  // 3. Load Current User Shield Status
+  if (currentUser) {
+    try {
+      const risk = await apiRequest('/ai/abuse/my-status');
+      const scoreEl = document.getElementById('aiUserRiskScore');
+      const holdsEl = document.getElementById('aiUserActiveHolds');
+      const badgeEl = document.getElementById('aiUserShieldBadge');
+
+      if (scoreEl) scoreEl.innerHTML = `User Risk Score: <strong>${risk.riskScore} (${risk.riskLevel})</strong>`;
+      if (holdsEl) holdsEl.innerHTML = `Concurrent Holds: <strong>${risk.activeHoldsCount} / 3 Allowed</strong>`;
+      if (badgeEl) {
+        if (risk.flagged) {
+          badgeEl.innerText = 'THROTTLED';
+          badgeEl.style.background = 'rgba(239,68,68,0.2)';
+          badgeEl.style.color = '#f87171';
+        } else {
+          badgeEl.innerText = 'PROTECTED';
+          badgeEl.style.background = 'rgba(16,185,129,0.15)';
+          badgeEl.style.color = '#34d399';
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load user shield status', err);
+    }
+  }
+}
+
+async function showAiRecommendations() {
+  openAiCopilotTab();
+  await sendAiQuickPrompt('Recommend best slot to minimize calendar gaps');
+}
+
+async function loadBookingNoShowRisk(bookingId) {
+  try {
+    const risk = await apiRequest(`/ai/no-show-risk/${bookingId}`);
+    const badge = document.getElementById(`ai-risk-${bookingId}`);
+    if (badge) {
+      const pct = Math.round(risk.noShowProbability * 100);
+      if (risk.riskCategory === 'HIGH_RISK') {
+        badge.className = 'badge badge-risk-high';
+        badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> High No-Show Risk (${pct}%)`;
+      } else {
+        badge.className = 'badge badge-risk-low';
+        badge.innerHTML = `<i class="fa-solid fa-shield-check"></i> Attendance Confidence (${100 - pct}%)`;
+      }
+      badge.title = risk.riskFactors ? risk.riskFactors.join(' | ') : risk.recommendation;
+    }
+  } catch (err) {
+    console.error(`Failed to load risk for booking #${bookingId}`, err);
+  }
+}
+
+async function loadAdminAiAudit() {
+  try {
+    const report = await apiRequest('/ai/abuse/audit');
+    const tbody = document.getElementById('adminAiAuditTableBody');
+    if (!tbody) return;
+
+    if (!report || report.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 18px;">No users currently registered</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = report.map(u => `
+      <tr>
+        <td>#${u.userId}</td>
+        <td><strong>${escapeHtml(u.email)}</strong></td>
+        <td>${u.riskScore}</td>
+        <td>
+          <span class="badge ${u.riskLevel === 'HIGH_RISK' ? 'badge-risk-high' : 'badge-risk-low'}">
+            ${u.riskLevel}
+          </span>
+        </td>
+        <td>${u.activeHoldsCount}</td>
+        <td>${u.recentHoldsCount} / min</td>
+        <td>${Math.round(u.abandonmentRate * 100)}%</td>
+        <td>
+          ${u.flagged 
+            ? '<span style="color: var(--danger); font-weight: 700;"><i class="fa-solid fa-ban"></i> THROTTLED</span>' 
+            : '<span style="color: var(--success); font-weight: 600;"><i class="fa-solid fa-check"></i> ACTIVE</span>'}
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    const tbody = document.getElementById('adminAiAuditTableBody');
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--danger); padding: 18px;">${escapeHtml(err.message)}</td></tr>`;
+    }
   }
 }

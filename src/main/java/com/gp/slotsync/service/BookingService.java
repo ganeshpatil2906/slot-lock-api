@@ -31,21 +31,39 @@ public class BookingService {
     private final SlotRepository slotRepository;
     private final UserRepository userRepository;
     private final int defaultHoldMinutes;
+    private final com.gp.slotsync.ai.service.DynamicTtlService dynamicTtlService;
+    private final com.gp.slotsync.ai.service.AbuseDetectionService abuseDetectionService;
 
     public BookingService(BookingRepository bookingRepository,
                           SlotRepository slotRepository,
                           UserRepository userRepository,
                           @Value("${jwt.hold-default-minutes:15}") int defaultHoldMinutes) {
+        this(bookingRepository, slotRepository, userRepository, defaultHoldMinutes, null, null);
+    }
+
+    public BookingService(BookingRepository bookingRepository,
+                          SlotRepository slotRepository,
+                          UserRepository userRepository,
+                          @Value("${jwt.hold-default-minutes:15}") int defaultHoldMinutes,
+                          com.gp.slotsync.ai.service.DynamicTtlService dynamicTtlService,
+                          com.gp.slotsync.ai.service.AbuseDetectionService abuseDetectionService) {
         this.bookingRepository = bookingRepository;
         this.slotRepository = slotRepository;
         this.userRepository = userRepository;
         this.defaultHoldMinutes = defaultHoldMinutes;
+        this.dynamicTtlService = dynamicTtlService;
+        this.abuseDetectionService = abuseDetectionService;
     }
 
     @Transactional
     public BookingResponse holdSlot(HoldSlotRequest request, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userEmail));
+
+        // AI Abuse & Bot Shield Check
+        if (abuseDetectionService != null) {
+            abuseDetectionService.validateHoldAllowed(user);
+        }
 
         // Idempotency check
         Optional<Booking> existingBookingOpt = bookingRepository.findByIdempotencyKey(request.idempotencyKey());
@@ -64,15 +82,32 @@ public class BookingService {
             throw new SlotUnavailableException("Slot is not available for booking. Current status: " + slot.getStatus());
         }
 
-        int holdMinutes = (request.holdDurationMinutes() != null && request.holdDurationMinutes() > 0)
-                ? request.holdDurationMinutes()
-                : defaultHoldMinutes;
+        // Track velocity
+        if (dynamicTtlService != null) {
+            dynamicTtlService.recordHoldAttempt(slot.getId());
+        }
+
+        int holdMinutes;
+        if (request.holdDurationMinutes() != null && request.holdDurationMinutes() > 0) {
+            holdMinutes = request.holdDurationMinutes();
+        } else if (dynamicTtlService != null) {
+            holdMinutes = dynamicTtlService.calculateTtl(slot).recommendedTtlMinutes();
+        } else {
+            holdMinutes = defaultHoldMinutes;
+        }
 
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(holdMinutes);
 
         // Update slot status (triggers Optimistic Lock check via @Version)
         slot.setStatus(SlotStatus.HELD);
-        slotRepository.save(slot);
+        try {
+            slotRepository.save(slot);
+        } catch (org.springframework.dao.OptimisticLockingFailureException | jakarta.persistence.OptimisticLockException ex) {
+            if (dynamicTtlService != null) {
+                dynamicTtlService.recordCollision(slot.getId());
+            }
+            throw ex;
+        }
 
         Booking booking = new Booking();
         booking.setUser(user);

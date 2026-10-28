@@ -48,6 +48,9 @@
       <button class="tab-btn" data-tab="myBookingsTab">
         <i class="fa-solid fa-ticket"></i> My Bookings
       </button>
+      <button class="tab-btn" data-tab="aiTab" id="aiTabBtn">
+        <i class="fa-solid fa-wand-magic-sparkles" style="color: #c084fc;"></i> AI Copilot & Hub
+      </button>
       <button class="tab-btn admin-only" data-tab="adminTab" id="adminTabBtn" style="display: none;">
         <i class="fa-solid fa-gear"></i> Admin Actions
       </button>
@@ -60,9 +63,14 @@
           <h2>Available Time Slots</h2>
           <p>Find and hold available time slots in real time</p>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="loadSlots()">
-          <i class="fa-solid fa-rotate-right"></i> Refresh
-        </button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary btn-sm" onclick="showAiRecommendations()">
+            <i class="fa-solid fa-wand-magic-sparkles" style="color: #c084fc;"></i> AI Recommendations
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="loadSlots()">
+            <i class="fa-solid fa-rotate-right"></i> Refresh
+          </button>
+        </div>
       </div>
 
       <!-- Filters -->
@@ -133,12 +141,141 @@
       </div>
     </section>
 
-    <!-- TAB 4: ADMIN PANEL -->
+    <!-- TAB 4: AI COPILOT & HUB -->
+    <section class="tab-content" id="aiTab">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2><i class="fa-solid fa-wand-magic-sparkles" style="color: #c084fc;"></i> SlotSync AI Copilot & Optimization Hub</h2>
+          <p>Autonomous conversational booking agent, predictive dynamic TTLs, and schedule packing</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="refreshAiHubData()">
+          <i class="fa-solid fa-rotate-right"></i> Refresh AI Stats
+        </button>
+      </div>
+
+      <div class="ai-hub-grid">
+        <!-- AI Chat Copilot (Left Column) -->
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">
+            <div class="ai-chat-title">
+              <i class="fa-solid fa-robot" style="color: #c084fc;"></i>
+              <span>SlotSync AI Copilot</span>
+            </div>
+            <div class="ai-engine-pill">
+              <i class="fa-solid fa-circle" style="color: #34d399; font-size: 0.55rem;"></i>
+              <span>Tool-Calling Active</span>
+            </div>
+          </div>
+
+          <!-- Message Feed -->
+          <div class="ai-chat-feed" id="aiChatFeed">
+            <div class="chat-msg assistant">
+              <div class="chat-avatar"><i class="fa-solid fa-robot"></i></div>
+              <div class="chat-bubble">
+Hello! I am your <strong>SlotSync AI Copilot</strong>. 🚀
+
+I can search available slots, recommend the best time to minimize calendar gaps, trigger automated holds with <strong>dynamic lock TTLs</strong>, and confirm reservations using natural language.
+
+Try clicking a suggestion below or type your request!
+                <div class="chat-actions-container">
+                  <button class="chat-action-btn" onclick="sendAiQuickPrompt('Recommend best slot to minimize gaps')">
+                    <i class="fa-solid fa-chart-line"></i> Recommend Best Slot
+                  </button>
+                  <button class="chat-action-btn" onclick="sendAiQuickPrompt('Show available slots')">
+                    <i class="fa-solid fa-magnifying-glass"></i> Show Available Slots
+                  </button>
+                  <button class="chat-action-btn" onclick="sendAiQuickPrompt('Why is dynamic TTL used?')">
+                    <i class="fa-solid fa-bolt"></i> Why Dynamic TTL?
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Prompts Bar -->
+          <div class="quick-prompts-bar">
+            <button class="quick-chip" onclick="sendAiQuickPrompt('Find available meeting rooms')">🔍 Find Rooms</button>
+            <button class="quick-chip" onclick="sendAiQuickPrompt('Recommend best slot')">⭐ Best Slot Match</button>
+            <button class="quick-chip" onclick="sendAiQuickPrompt('Show my bookings and risk')">📋 My Bookings</button>
+            <button class="quick-chip" onclick="sendAiQuickPrompt('Explain contention and optimistic locking')">⚡ Lock Contention</button>
+          </div>
+
+          <!-- Input Bar -->
+          <div class="ai-chat-input-bar">
+            <input type="text" class="ai-chat-input" id="aiChatInput" placeholder="Ask AI (e.g. 'Hold slot 3', 'Recommend best meeting room')..." onkeydown="if(event.key==='Enter') sendAiMessage()">
+            <button class="btn btn-primary btn-sm" onclick="sendAiMessage()">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- AI Real-Time Insights (Right Column) -->
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <!-- Card 1: System Contention & Dynamic Hold Monitor -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-bolt" style="color: #22d3ee;"></i> Dynamic Lock TTL Engine
+              </div>
+              <span class="badge badge-dynamic-ttl" id="aiContentionPill">MONITORING</span>
+            </div>
+            <div class="card-body">
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
+                <span class="text-muted">System Contention Index:</span>
+                <strong id="aiContentionScore">0.00 / 1.00</strong>
+              </div>
+              <div class="contention-meter-bg">
+                <div class="contention-meter-fill" id="aiContentionBar" style="width: 15%; background: #22d3ee;"></div>
+              </div>
+              <div style="margin-top: 14px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;" id="aiTuningAdvice">
+                AI dynamically scales slot hold timers (2m to 25m) based on real-time collision pressure to protect database throughput.
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: AI Schedule Gap-Saver Top Picks -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color: #c084fc;"></i> Optimal Packing Picks
+              </div>
+            </div>
+            <div class="card-body" id="aiTopPicksContainer">
+              <div style="font-size: 0.84rem; color: var(--text-muted);">
+                <i class="fa-solid fa-spinner fa-spin"></i> Analyzing schedule fragmentation...
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Anti-Scalper & Bot Shield Status -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-shield-halved" style="color: #10b981;"></i> Scalper Shield Status
+              </div>
+              <span class="badge" id="aiUserShieldBadge" style="background: rgba(16,185,129,0.15); color: #34d399;">PROTECTED</span>
+            </div>
+            <div class="card-body">
+              <div class="info-row">
+                <i class="fa-solid fa-user-shield info-icon"></i>
+                <span id="aiUserRiskScore">User Risk Score: <strong>0.00 (Low Risk)</strong></span>
+              </div>
+              <div class="info-row" style="margin-top: 8px;">
+                <i class="fa-solid fa-hand-holding info-icon"></i>
+                <span id="aiUserActiveHolds">Concurrent Holds: <strong>0 / 3 Allowed</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: ADMIN PANEL -->
     <section class="tab-content" id="adminTab">
       <div class="panel-header">
         <div class="panel-title">
           <h2>Admin Management Panel</h2>
-          <p>Create new bookable resources and generate time slots</p>
+          <p>Create new bookable resources, generate time slots, and monitor bot shield</p>
         </div>
       </div>
 
@@ -188,10 +325,56 @@
             </button>
           </form>
         </div>
+
+        <!-- AI Operations & Bot Shield Center -->
+        <div class="card" style="grid-column: 1 / -1;">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-brain" style="color: #a855f7;"></i> AI Operations & Anti-Scalper Bot Shield
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="loadAdminAiAudit()">
+              <i class="fa-solid fa-rotate-right"></i> Re-Audit Users
+            </button>
+          </div>
+          <div class="card-body">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+              Real-time behavioral anomaly detection auditing reservation velocity, hold abandonment ratios, and concurrency starvation across user sessions.
+            </p>
+            <div style="overflow-x: auto;">
+              <table class="ai-audit-table">
+                <thead>
+                  <tr>
+                    <th>User ID</th>
+                    <th>Email</th>
+                    <th>Risk Score</th>
+                    <th>Risk Level</th>
+                    <th>Active Holds</th>
+                    <th>Recent (1m)</th>
+                    <th>Abandonment Rate</th>
+                    <th>Shield Status</th>
+                  </tr>
+                </thead>
+                <tbody id="adminAiAuditTableBody">
+                  <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 18px;">
+                      Click "Re-Audit Users" to compile real-time security report
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
   </div>
+
+  <!-- FLOATING AI COPILOT BUTTON -->
+  <button class="ai-fab-btn" id="aiFabBtn" onclick="openAiCopilotTab()">
+    <i class="fa-solid fa-wand-magic-sparkles"></i>
+    <span>Ask SlotSync AI</span>
+  </button>
 
   <!-- AUTH MODAL (Login / Register) -->
   <div class="modal-overlay" id="authModal">

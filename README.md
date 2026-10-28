@@ -6,9 +6,10 @@
 [![Flyway](https://img.shields.io/badge/Flyway-Migration-CC0200?style=for-the-badge&logo=flyway&logoColor=white)](https://flywaydb.org/)
 [![Playwright](https://img.shields.io/badge/Playwright-E2E_Tests-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)](https://playwright.dev/java/)
 [![Swagger](https://img.shields.io/badge/Swagger-OpenAPI_3.0-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)](http://localhost:8088/swagger-ui.html)
+[![AI Engine](https://img.shields.io/badge/AI_Engine-Copilot_%26_Optimization-purple?style=for-the-badge&logo=openai&logoColor=white)](http://localhost:8088)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
-> **SlotSync** is an enterprise-grade slot reservation and resource booking platform built with **Spring Boot 3** and **MySQL**. It solves real-world high-concurrency race conditions and double-booking problems using **JPA Optimistic Locking (`@Version`)**, a **Two-Phase Reservation Protocol (Hold & Confirm)**, guaranteed **API Idempotency**, background **TTL expiration schedulers**, and automated **Playwright E2E regression testing**.
+> **SlotSync** is an enterprise-grade slot reservation and resource booking platform built with **Spring Boot 3**, **MySQL**, and an integrated **AI Optimization & Copilot Engine**. It solves real-world high-concurrency race conditions and double-booking problems using **JPA Optimistic Locking (`@Version`)**, a **Two-Phase Reservation Protocol (Hold & Confirm)**, **AI Dynamic Hold TTL**, **Anti-Scalper Bot Shielding**, **Predictive No-Show Risk Modeling**, guaranteed **API Idempotency**, background **TTL expiration schedulers**, and automated **Playwright E2E regression testing**.
 
 ---
 
@@ -20,6 +21,12 @@
   - [Optimistic Locking & Race-Condition Prevention](#optimistic-locking--race-condition-prevention)
   - [Idempotent Hold Operations](#idempotent-hold-operations)
   - [Automated TTL Hold Cleanup Scheduler](#automated-ttl-hold-cleanup-scheduler)
+- [🤖 SlotSync AI Suite & Intelligent Scheduling](#-slotsync-ai-suite--intelligent-scheduling)
+  - [1. Conversational AI Booking Copilot (Tool-Calling)](#1-conversational-ai-booking-copilot-tool-calling)
+  - [2. Dynamic Hold TTL & Contention Optimizer](#2-dynamic-hold-ttl--contention-optimizer)
+  - [3. Predictive No-Show & Attendance Risk Engine](#3-predictive-no-show--attendance-risk-engine)
+  - [4. AI Schedule Gap-Saver & Packing Optimizer](#4-ai-schedule-gap-saver--packing-optimizer)
+  - [5. Anti-Scalper & Bot Hoarding Shield](#5-anti-scalper--bot-hoarding-shield)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
 - [Database Schema](#-database-schema)
@@ -100,6 +107,67 @@ sequenceDiagram
 ### Automated TTL Hold Cleanup Scheduler
 - A scheduled background worker (`HoldCleanupScheduler`) runs at regular intervals (default: every 30 seconds).
 - It queries all bookings where `status = 'HELD'` and `hold_expires_at < NOW()`, atomically resetting the associated slot back to `AVAILABLE` and marking the booking as `EXPIRED`.
+
+---
+
+## 🤖 SlotSync AI Suite & Intelligent Scheduling
+
+SlotSync incorporates a production-ready AI layer designed specifically for high-concurrency reservation systems. It combines **Agentic Tool-Calling LLMs** with **Predictive Heuristics and Real-Time Concurrency Analytics**:
+
+```mermaid
+graph TD
+    User["Client / User"] --> Copilot["🤖 Conversational AI Copilot"]
+    User --> REST["📡 REST API"]
+    
+    Copilot --> IntentRouter{"Intent Router & Tool-Caller"}
+    IntentRouter -->|HOLD_SLOT| DynamicTTL["⚡ Dynamic Hold TTL Engine"]
+    IntentRouter -->|RECOMMEND| ScheduleOptimizer["🧩 Gap-Saver Schedule Optimizer"]
+    IntentRouter -->|CONFIRM| BookingSvc["Booking Service"]
+    
+    REST --> BotShield["🛡️ Anti-Scalper Bot Shield"]
+    BotShield -->|Risk Validated| DynamicTTL
+    DynamicTTL --> OptimisticLock["JPA @Version Optimistic Lock"]
+    BookingSvc --> NoShowPredictor["📊 No-Show & Attendance Predictor"]
+```
+
+### 1. Conversational AI Booking Copilot (Tool-Calling)
+- Users can naturally query the assistant via the dashboard's floating Copilot interface (`/api/v1/ai/copilot/chat`).
+- The Copilot translates natural language into backend operations with structured intent routing:
+  - *"Find meeting rooms open tomorrow"* -> Triggers `getSlots()`
+  - *"Recommend the best slot to minimize gaps"* -> Triggers `SlotOptimizerService`
+  - *"Hold slot #3"* -> Triggers `holdSlot()` with dynamic TTL calculation
+  - *"Confirm my reservation"* -> Confirms the active hold
+  - *"Why is my hold duration 3 minutes?"* -> Explains concurrency contention in plain English
+- Emits one-tap interactive action buttons in the chat feed.
+- Supports hybrid operation: Zero-dependency smart heuristic agent out of the box, with seamless plug-and-play support for Google Gemini (`GEMINI_API_KEY`) or OpenAI (`OPENAI_API_KEY`).
+
+### 2. Dynamic Hold TTL & Contention Optimizer
+- Solves inventory starvation and lock contention in flash-sale or high-traffic scenarios:
+  - When contention is high (multiple collisions / `OptimisticLockingFailureException`), the AI automatically tightens hold windows from `15 mins` down to **`2–5 mins`** so abandoned holds cycle back into circulation rapidly.
+  - When slots are imminent (starts in < 15 mins), TTL is dynamically capped to prevent hold hoarding.
+  - Quiet, low-contention slots receive generous checkout windows (up to 25 mins).
+- Exposes real-time system metrics via `/api/v1/ai/contention/analytics`.
+
+### 3. Predictive No-Show & Attendance Risk Engine
+- When a reservation is confirmed, the AI predicts the probability of cancellation or no-show (`/api/v1/ai/no-show-risk/{bookingId}`).
+- Factors analyzed:
+  - Advance lead time (bookings made > 14 days in advance show higher cancellation probability)
+  - Time of day (early morning or late evening variance)
+  - Day of week (weekend vs weekday commitment)
+  - User's historical cancellation and abandonment rates
+- Generates categorized risk levels (`LOW_RISK`, `MODERATE_RISK`, `HIGH_RISK`) and auto-reconfirmation recommendations.
+
+### 4. AI Schedule Gap-Saver & Packing Optimizer
+- Mitigates schedule fragmentation where isolated 15–30 minute unusable gaps are left between reservations.
+- Evaluates available time slots and scores their packing efficiency (0–100%):
+  - Back-to-back contiguous bookings earn higher efficiency badges (`⭐ Best Match • Gap Saver`).
+  - Penalizes slots that leave awkward idle orphan slots.
+
+### 5. Anti-Scalper & Bot Hoarding Shield
+- Multi-dimensional behavioral anomaly detection to prevent malicious bots from locking up inventory:
+  - Velocity rate limiting (detects rapid bursts of hold attempts within 60s windows).
+  - Enforces concurrent unconfirmed hold quotas (max 3 concurrent active holds per standard user).
+  - Evaluates historical hold abandonment ratios to flag abusive accounts (`/api/v1/ai/abuse/audit`).
 
 ---
 
@@ -230,6 +298,17 @@ All endpoints are documented via Swagger UI at `http://localhost:8088/swagger-ui
 | `POST` | `/api/v1/bookings/confirm` | Authenticated | **Phase 2**: Finalize held booking before TTL expiration |
 | `POST` | `/api/v1/bookings/{id}/cancel` | Authenticated | Cancel booking & immediately return slot to `AVAILABLE` |
 | `GET` | `/api/v1/bookings/my-bookings`| Authenticated | Retrieve all bookings made by the logged-in user |
+
+### AI Engine & Intelligent Scheduling (`/api/v1/ai`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/ai/copilot/chat` | Authenticated | Conversational AI copilot with tool-calling (search, hold, confirm, optimize) |
+| `GET` | `/api/v1/ai/dynamic-ttl/{slotId}` | Authenticated | Calculates real-time dynamic hold TTL based on concurrency contention |
+| `GET` | `/api/v1/ai/contention/analytics` | Authenticated | System-wide concurrency collision analytics and auto-tuning recommendations |
+| `GET` | `/api/v1/ai/no-show-risk/{bookingId}` | Authenticated | Predicts cancellation probability and attendance risk for a booking |
+| `GET` | `/api/v1/ai/recommendations` | Authenticated | Recommends time slots that minimize calendar fragmentation and orphan gaps |
+| `GET` | `/api/v1/ai/abuse/audit` | Admin | Real-time bot shield audit inspecting velocity and abandonment rates |
+| `GET` | `/api/v1/ai/abuse/my-status` | Authenticated | Inspects risk score and active hold quotas for the current user |
 
 ---
 

@@ -11,7 +11,6 @@ public class ResourcesPage extends BasePage {
     private final Locator tabSection;
     private final Locator heading;
     private final Locator addResourceBtn;
-    private final Locator resourcesGrid;
     private final Locator resourceCards;
 
     public ResourcesPage(Page page) {
@@ -19,7 +18,6 @@ public class ResourcesPage extends BasePage {
         this.tabSection = page.locator("#resourcesTab");
         this.heading = page.locator("#resourcesTab .panel-title h2");
         this.addResourceBtn = page.locator("#createResourceBtn");
-        this.resourcesGrid = page.locator("#resourcesGrid");
         this.resourceCards = page.locator("#resourcesGrid .card");
     }
 

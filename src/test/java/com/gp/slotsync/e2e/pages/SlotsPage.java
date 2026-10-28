@@ -13,7 +13,6 @@ public class SlotsPage extends BasePage {
     private final Locator filterResource;
     private final Locator filterStatus;
     private final Locator refreshButton;
-    private final Locator slotsGrid;
     private final Locator slotCards;
 
     public SlotsPage(Page page) {
@@ -23,7 +22,6 @@ public class SlotsPage extends BasePage {
         this.filterResource = page.locator("#filterResource");
         this.filterStatus = page.locator("#filterStatus");
         this.refreshButton = page.locator("#slotsTab .panel-header button");
-        this.slotsGrid = page.locator("#slotsGrid");
         this.slotCards = page.locator("#slotsGrid .card");
     }
 

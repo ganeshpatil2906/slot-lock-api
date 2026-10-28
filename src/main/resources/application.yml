@@ -26,3 +26,19 @@ springdoc:
 server:
   port: 8088
 
+slotsync:
+  ai:
+    enabled: true
+    provider: ${AI_PROVIDER:internal} # internal, gemini, openai
+    gemini-api-key: ${GEMINI_API_KEY:}
+    openai-api-key: ${OPENAI_API_KEY:}
+    dynamic-ttl:
+      base-minutes: 15
+      min-minutes: 2
+      max-minutes: 25
+    abuse-shield:
+      enabled: true
+      max-holds-per-minute: 5
+      max-concurrent-holds: 3
+
+
